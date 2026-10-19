@@ -1,0 +1,4 @@
+interface:
+  display_name: "BMAD GOAP Interview"
+  short_description: "Clarify fuzzy intent into a confirmed GOAP spec"
+  default_prompt: "Use $bmad-goap-interview to interview me from a fuzzy business need into a confirmed GOAP InterviewSpec."

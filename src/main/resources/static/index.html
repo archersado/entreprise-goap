@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Semantic GOAP Agent 工作台">
+    <title>GOAP Agent Workbench</title>
+    <link rel="stylesheet" href="/app.css">
+</head>
+<body>
+<div class="shell">
+    <aside class="sidebar">
+        <div class="brand">
+            <span class="brand-mark">G</span>
+            <div><strong>GOAP Studio</strong><small>Agent Workbench</small></div>
+        </div>
+
+        <nav class="nav" aria-label="主导航">
+            <button class="nav-item active" data-view="workbench"><span>⌁</span> 工作台</button>
+            <button class="nav-item" data-view="model"><span>◇</span> 语义模型</button>
+            <button class="nav-item" data-view="runs"><span>↗</span> 运行记录</button>
+        </nav>
+
+        <div class="sidebar-section">
+            <div class="section-label">当前场景</div>
+            <button class="scenario active">
+                <span class="scenario-icon">研</span>
+                <span><strong id="sidebarScenario">订单履约研发闭环</strong><small>5 个角色 · 5 项能力</small></span>
+                <i></i>
+            </button>
+        </div>
+
+        <div class="runtime-card">
+            <div class="runtime-title"><span class="pulse amber"></span>DSH Runtime</div>
+            <strong>适配就绪 · 未连接</strong>
+            <small>会话与 Tool Bridge 待部署</small>
+        </div>
+        <div class="sidebar-footer">Semantic GOAP MVP <span>v0.1</span></div>
+    </aside>
+
+    <main>
+        <header class="topbar">
+            <div>
+                <div class="eyebrow">ENTERPRISE AGENT ORCHESTRATION</div>
+                <h1>Agent 工作台</h1>
+            </div>
+            <div class="top-actions">
+                <div class="health"><span class="pulse"></span>GOAP API 在线</div>
+                <button class="ghost" id="loadExample">载入示例</button>
+                <button class="primary" id="runPipeline"><span>▶</span> 运行管线</button>
+            </div>
+        </header>
+
+        <section class="view active" id="workbenchView">
+            <div class="workspace-grid">
+                <div class="left-column">
+                    <article class="panel interview-panel">
+                        <div class="panel-heading">
+                            <div><span class="step-tag">01</span><h2>业务访谈</h2></div>
+                            <span class="status-pill neutral" id="interviewStatus">等待输入</span>
+                        </div>
+                        <label class="field-label" for="scenarioName">场景名称</label>
+                        <input id="scenarioName" value="订单履约研发闭环" autocomplete="off">
+                        <label class="field-label" for="transcript">用自然语言描述业务目标、约束和角色分工</label>
+                        <textarea id="transcript" rows="7">我们先访谈并确认需求，设计评审通过后开发，实现完成后跑自动化测试，全部通过才能生成发布候选；失败转人工。</textarea>
+                        <div class="editor-footer">
+                            <span><kbd>⌘</kbd><kbd>↵</kbd> 运行</span>
+                            <span id="charCount">0 字</span>
+                        </div>
+                    </article>
+
+                    <article class="panel flow-panel">
+                        <div class="panel-heading compact">
+                            <div><span class="step-tag">02</span><h2>Agent 协作图</h2></div>
+                            <span class="minor" id="graphMeta">等待生成</span>
+                        </div>
+                        <div id="agentFlow" class="empty-state">
+                            <div class="empty-glyph">⌁</div>
+                            <strong>尚未生成执行图</strong>
+                            <span>运行管线后，这里会显示角色和能力链路</span>
+                        </div>
+                    </article>
+                </div>
+
+                <aside class="right-column">
+                    <article class="panel overview-panel">
+                        <div class="panel-heading compact"><div><span class="step-tag">03</span><h2>运行概览</h2></div></div>
+                        <div class="goal-ring" id="goalRing"><div><strong>—</strong><span>目标状态</span></div></div>
+                        <div class="metric-grid">
+                            <div><span>动作</span><strong id="actionCount">—</strong></div>
+                            <div><span>重规划</span><strong id="replanCount">—</strong></div>
+                            <div><span>证据</span><strong id="evidenceCount">—</strong></div>
+                            <div><span>校验</span><strong id="validationState">—</strong></div>
+                        </div>
+                    </article>
+
+                    <article class="panel activity-panel">
+                        <div class="panel-heading compact"><div><h2>执行轨迹</h2></div><span class="live-label">LIVE</span></div>
+                        <div id="timeline" class="timeline-placeholder">运行后显示逐步规划与执行证据</div>
+                    </article>
+
+                    <article class="panel dsh-panel">
+                        <div class="dsh-heading"><span class="dsh-logo">D</span><div><strong>DeepSeek Harness</strong><small>推荐作为会话与 Agent Loop 层</small></div></div>
+                        <div class="bridge-row"><span>Session / LLM / UI</span><i>DSH</i></div>
+                        <div class="bridge-line"></div>
+                        <div class="bridge-row"><span>Typed Tool Bridge</span><i>HTTP</i></div>
+                        <div class="bridge-line"></div>
+                        <div class="bridge-row"><span>GOAP / Evidence</span><i>JVM</i></div>
+                    </article>
+                </aside>
+            </div>
+        </section>
+
+        <section class="view" id="modelView">
+            <article class="panel page-panel">
+                <div class="panel-heading"><div><h2>Semantic GOAP 模型</h2><p>强类型控制面，保留来源与置信度</p></div><button class="ghost" id="copyModel">复制 JSON</button></div>
+                <pre id="modelJson">运行管线后显示候选模型。</pre>
+            </article>
+        </section>
+
+        <section class="view" id="runsView">
+            <article class="panel page-panel">
+                <div class="panel-heading"><div><h2>本次运行记录</h2><p>当前 MVP 的记录保存在页面会话内</p></div></div>
+                <div id="runTable" class="empty-table">暂无运行记录</div>
+            </article>
+        </section>
+    </main>
+</div>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+<script src="/app.js"></script>
+</body>
+</html>

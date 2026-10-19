@@ -1,0 +1,8 @@
+target/
+.m2/
+.idea/
+*.iml
+.DS_Store
+*.log
+.env
+.dsh-runtime/

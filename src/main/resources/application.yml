@@ -1,0 +1,8 @@
+spring:
+  application:
+    name: enterprise-semantic-goap
+  main:
+    banner-mode: off
+
+server:
+  port: ${PORT:8080}
