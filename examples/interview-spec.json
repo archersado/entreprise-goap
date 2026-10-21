@@ -9,12 +9,12 @@
     { "id": "manager", "name": "审批 Agent", "responsibilities": ["核对并批准订单"] }
   ],
   "states": [
-    { "id": "order_complete", "description": "订单资料完整", "observable": true, "evidenceRequired": "订单字段校验报告" },
-    { "id": "order_incomplete", "description": "订单资料存在缺项", "observable": true, "evidenceRequired": "缺失字段清单" },
-    { "id": "order_rejected", "description": "订单被经理驳回", "observable": true, "evidenceRequired": "驳回记录" },
-    { "id": "order_approved", "description": "订单已经批准", "observable": true, "evidenceRequired": "审批记录" },
-    { "id": "approval_withdrawn", "description": "审批已经撤回", "observable": true, "evidenceRequired": "撤回记录" },
-    { "id": "order_data_removed", "description": "订单资料已经清除", "observable": true, "evidenceRequired": "数据清除审计记录" }
+    { "id": "order_complete", "description": "订单资料完整", "observable": true, "evidenceRequired": "订单字段校验报告", "semanticQuery": "OrderComplete($order)", "unknownStrategy": "FALSE", "conflictStrategy": "BLOCK" },
+    { "id": "order_incomplete", "description": "订单资料存在缺项", "observable": true, "evidenceRequired": "缺失字段清单", "semanticQuery": "OrderIncomplete($order)", "unknownStrategy": "FALSE", "conflictStrategy": "BLOCK" },
+    { "id": "order_rejected", "description": "订单被经理驳回", "observable": true, "evidenceRequired": "驳回记录", "semanticQuery": "OrderRejected($order)", "unknownStrategy": "FALSE", "conflictStrategy": "BLOCK" },
+    { "id": "order_approved", "description": "订单已经批准", "observable": true, "evidenceRequired": "审批记录", "semanticQuery": "OrderApproved($order)", "unknownStrategy": "FALSE", "conflictStrategy": "BLOCK" },
+    { "id": "approval_withdrawn", "description": "审批已经撤回", "observable": true, "evidenceRequired": "撤回记录", "semanticQuery": "ApprovalWithdrawn($order)", "unknownStrategy": "FALSE", "conflictStrategy": "BLOCK" },
+    { "id": "order_data_removed", "description": "订单资料已经清除", "observable": true, "evidenceRequired": "数据清除审计记录", "semanticQuery": "OrderDataRemoved($order)", "unknownStrategy": "FALSE", "conflictStrategy": "BLOCK" }
   ],
   "actions": [
     {

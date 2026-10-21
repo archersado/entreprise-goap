@@ -6,3 +6,6 @@ spring:
 
 server:
   port: ${PORT:8080}
+
+goap:
+  scenario-store-dir: ${GOAP_SCENARIO_STORE_DIR:.goap-data/scenarios}

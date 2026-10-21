@@ -41,7 +41,7 @@ class SemanticGoapValidator(private val registry: CapabilityRegistry) {
                     "negative predicate syntax '$it' is not supported; model an explicit positive state instead",
                 )
             }
-            (capability.preconditions.filterNot(::isNegatedPredicate) + capability.effects + capability.removes)
+            (capability.preconditions.filterNot(::isNegatedPredicate) + capability.effects + capability.removes + capability.observes)
                 .filterNot(predicates::contains).forEach {
                 errors += ValidationIssue("capabilities[$index]", "unknown predicate '$it'")
             }
@@ -54,8 +54,8 @@ class SemanticGoapValidator(private val registry: CapabilityRegistry) {
             if (!registry.contains(capability.executor)) {
                 errors += ValidationIssue("capabilities[$index].executor", "unbound executor '${capability.executor}'")
             }
-            if (capability.effects.isEmpty()) {
-                errors += ValidationIssue("capabilities[$index].effects", "an action must assert at least one observable effect")
+            if (capability.effects.isEmpty() && capability.removes.isEmpty() && capability.observes.isEmpty()) {
+                errors += ValidationIssue("capabilities[$index].effects", "an action must assert, retract, or observe at least one predicate")
             }
             if (capability.failureModes.isEmpty() && capability.noKnownFailureRationale.isBlank()) {
                 errors += ValidationIssue("capabilities[$index].failureModes", "failure modes must be modeled or explicitly ruled out with a rationale")
@@ -108,9 +108,21 @@ class SemanticGoapValidator(private val registry: CapabilityRegistry) {
             goal.satisfiedBy.filterNot(predicates::contains).forEach {
                 errors += ValidationIssue("goals[$index]", "unknown predicate '$it'")
             }
-            val producible = model.capabilities.flatMap { it.effects }.toSet()
+            val producible = model.capabilities.flatMap { it.effects + it.observes }.toSet()
             goal.satisfiedBy.filterNot(producible::contains).forEach {
                 warnings += ValidationIssue("goals[$index]", "predicate '$it' has no producing capability")
+            }
+        }
+
+
+        model.predicates.forEachIndexed { index, predicate ->
+            if (predicate.semanticQuery.isBlank()) {
+                warnings += ValidationIssue("predicates[$index].semanticQuery", "predicate '${predicate.id}' has no Semantica query binding")
+            }
+            if (predicate.unknownStrategy == com.acme.enterprisegoap.model.ProjectionStrategy.OBSERVE &&
+                model.capabilities.none { predicate.id in it.observes }
+            ) {
+                errors += ValidationIssue("predicates[$index].unknownStrategy", "predicate '${predicate.id}' requires observation but no action observes it")
             }
         }
 

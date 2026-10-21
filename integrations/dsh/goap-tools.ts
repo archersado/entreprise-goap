@@ -68,6 +68,15 @@ async function postJson(baseUrl: string, path: string, body: JsonValue, signal: 
   return value
 }
 
+function sessionId(exec: { agent?: { sessionId?: unknown } }): string | undefined {
+  return exec.agent?.sessionId === undefined ? undefined : String(exec.agent.sessionId)
+}
+
+function contextual(exec: { agent?: { sessionId?: unknown } }, key: string, value: JsonValue): JsonValue {
+  const currentSessionId = sessionId(exec)
+  return { [key]: value, ...(currentSessionId ? { sessionId: currentSessionId } : {}) }
+}
+
 const jsonOutput = {
   schema: { type: 'json' as const },
   render: (_args: unknown, value: JsonValue) => [{ type: 'text' as const, text: JSON.stringify(value) }],
@@ -79,14 +88,27 @@ const jsonOutput = {
  */
 export function registerSemanticGoapTools(ctx: Context, baseUrl = 'http://127.0.0.1:8080') {
   ctx.tools.register(defineTool({
+    name: 'semantic_goap_scenario_current',
+    description: 'Read the complete persisted scenario and latest version bound by the GUI to this CUI session. Call this first after a GUI scenario switch/edit or when continuing previous work.',
+    parameters: {},
+    output: jsonOutput,
+    timeoutMs: 30_000,
+    execute: (_args, exec) => {
+      const currentSessionId = sessionId(exec)
+      if (!currentSessionId) throw new Error('Current DSH session id is unavailable')
+      return postJson(baseUrl, '/api/scenarios/current', { sessionId: currentSessionId }, exec.signal)
+    },
+  }))
+
+  ctx.tools.register(defineTool({
     name: 'semantic_goap_spec_review',
-    description: 'Review the current versioned InterviewSpec and return structural gaps, including missing failure modes, recovery paths, removals, and reversibility decisions.',
+    description: 'Publish and review the live InterviewSpec after every answer. Start with a sparse DRAFT immediately so the GUI updates; progressively add semantic queries, projection strategies, observing actions, exceptions and reversibility.',
     parameters: {
       spec: { type: 'json', required: true, description: 'Complete current InterviewSpec JSON' },
     },
     output: jsonOutput,
     timeoutMs: 30_000,
-    execute: (args, exec) => postJson(baseUrl, '/api/interviews/spec/review', normalizeInterviewSpec(args.spec), exec.signal),
+    execute: (args, exec) => postJson(baseUrl, '/api/interviews/spec/review', contextual(exec, 'spec', normalizeInterviewSpec(args.spec)), exec.signal),
   }))
 
   ctx.tools.register(defineTool({
@@ -97,7 +119,7 @@ export function registerSemanticGoapTools(ctx: Context, baseUrl = 'http://127.0.
     },
     output: jsonOutput,
     timeoutMs: 30_000,
-    execute: (args, exec) => postJson(baseUrl, '/api/interviews/spec/build', normalizeInterviewSpec(args.spec), exec.signal),
+    execute: (args, exec) => postJson(baseUrl, '/api/interviews/spec/build', contextual(exec, 'spec', normalizeInterviewSpec(args.spec)), exec.signal),
   }))
 
   ctx.tools.register(defineTool({
@@ -108,7 +130,7 @@ export function registerSemanticGoapTools(ctx: Context, baseUrl = 'http://127.0.
     },
     output: jsonOutput,
     timeoutMs: 30_000,
-    execute: (args, exec) => postJson(baseUrl, '/api/models/validate', normalizeSemanticModel(args.model), exec.signal),
+    execute: (args, exec) => postJson(baseUrl, '/api/models/validate', contextual(exec, 'model', normalizeSemanticModel(args.model)), exec.signal),
   }))
 
   ctx.tools.register(defineTool({
@@ -119,7 +141,23 @@ export function registerSemanticGoapTools(ctx: Context, baseUrl = 'http://127.0.
     },
     output: jsonOutput,
     timeoutMs: 30_000,
-    execute: (args, exec) => postJson(baseUrl, '/api/models/compile', normalizeSemanticModel(args.model), exec.signal),
+    execute: (args, exec) => postJson(baseUrl, '/api/models/compile', contextual(exec, 'model', normalizeSemanticModel(args.model)), exec.signal),
+  }))
+
+  ctx.tools.register(defineTool({
+    name: 'semantic_goap_project',
+    description: 'Project a versioned Semantica four-valued snapshot into GOAP world state and explicit FALSE/BLOCK/OBSERVE/ESCALATE decisions.',
+    parameters: {
+      model: { type: 'json', required: true, description: 'Validated Layer 1 semantic model' },
+      snapshot: { type: 'json', required: true, description: 'Snapshot containing revision and TRUE/FALSE/UNKNOWN/CONFLICT facts' },
+    },
+    output: jsonOutput,
+    timeoutMs: 30_000,
+    execute: (args, exec) => postJson(baseUrl, '/api/semantic/project', {
+      model: normalizeSemanticModel(args.model),
+      snapshot: parseJsonValue(args.snapshot),
+      ...(sessionId(exec) ? { sessionId: sessionId(exec) } : {}),
+    } as JsonValue, exec.signal),
   }))
 
   ctx.tools.register(defineTool({
@@ -133,12 +171,15 @@ export function registerSemanticGoapTools(ctx: Context, baseUrl = 'http://127.0.
         items: { type: 'string' },
         description: 'Predicates already true before this run',
       },
+      semanticSnapshot: { type: 'json', description: 'Optional versioned Semantica snapshot; supersedes initialPredicates' },
+      outcomeOverrides: { type: 'json', description: 'MVP executor outcomes keyed by action id' },
     },
     output: jsonOutput,
     timeoutMs: 120_000,
     execute: (args, exec) => postJson(baseUrl, '/api/agents/run', {
       ...args,
       model: normalizeSemanticModel(args.model),
+      ...(sessionId(exec) ? { sessionId: sessionId(exec) } : {}),
     } as JsonValue, exec.signal),
   }))
 }

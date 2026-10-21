@@ -1,0 +1,28 @@
+{
+  "id": "case-resolution-layer-1",
+  "name": "Case Resolution Layer 1",
+  "description": "Minimal shared Predicate, Action and Goal contract for Semantica and GOAP",
+  "version": 1,
+  "predicates": [
+    {"id":"documents_complete","description":"Required documents are complete","semanticQuery":"DocumentsComplete($case)","unknownStrategy":"FALSE","conflictStrategy":"BLOCK"},
+    {"id":"risk_clear","description":"Semantic risk assessment is clear","semanticQuery":"RiskClear($case)","unknownStrategy":"OBSERVE","conflictStrategy":"ESCALATE"},
+    {"id":"case_resolved","description":"The case is resolved","semanticQuery":"CaseResolved($case)","unknownStrategy":"FALSE","conflictStrategy":"BLOCK"}
+  ],
+  "capabilities": [
+    {
+      "id":"assess_risk","description":"Ask Semantica to determine risk_clear","ownerRole":"risk-agent",
+      "executor":"demo:semantic-action","preconditions":["documents_complete"],"effects":[],"observes":["risk_clear"],"cost":3,
+      "evidenceType":"semantic_assessment","noKnownFailureRationale":"The MVP exposes failure at the executor boundary.","reversibility":"IRREVERSIBLE"
+    },
+    {
+      "id":"resolve_case_action","description":"Resolve the case after the semantic risk gate passes","ownerRole":"case-agent",
+      "executor":"demo:semantic-action","preconditions":["risk_clear"],"effects":["case_resolved"],"cost":1,
+      "evidenceType":"resolution_record","noKnownFailureRationale":"The MVP uses a deterministic local executor.","reversibility":"IRREVERSIBLE"
+    }
+  ],
+  "goals": [{"id":"resolve_case","description":"Reach a verified resolved state","satisfiedBy":["case_resolved"],"value":100}],
+  "roles": [
+    {"id":"risk-agent","description":"Evaluates semantic risk","capabilities":["assess_risk"]},
+    {"id":"case-agent","description":"Completes the case","capabilities":["resolve_case_action"]}
+  ]
+}

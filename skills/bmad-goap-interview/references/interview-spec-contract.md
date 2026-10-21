@@ -10,7 +10,10 @@ The canonical artifact is one versioned JSON object:
   "summary": "Scope summary",
   "objective": "Observable business outcome",
   "actors": [{"id":"role_id","name":"Role name","responsibilities":["..."]}],
-  "states": [{"id":"positive_fact","description":"...","observable":true,"evidenceRequired":"..."}],
+  "states": [{
+    "id":"positive_fact","description":"...","observable":true,"evidenceRequired":"...",
+    "semanticQuery":"PositiveFact($case)","unknownStrategy":"OBSERVE","conflictStrategy":"ESCALATE"
+  }],
   "actions": [{
     "id":"action_id",
     "name":"Action name",
@@ -19,6 +22,7 @@ The canonical artifact is one versioned JSON object:
     "preconditions":["positive_fact"],
     "effects":["new_fact"],
     "removes":["stale_fact"],
+    "observes":["fact_whose_truth_is_obtained"],
     "executor":"demo:semantic-action",
     "evidenceType":"evidence_kind",
     "failureHandling":"Human-readable summary",
@@ -51,6 +55,9 @@ The canonical artifact is one versioned JSON object:
 
 - State IDs express positive, observable facts. `NOT`, `!`, and `NOT(...)` syntax is unsupported.
 - `observable` is boolean and `evidenceRequired` is mandatory.
+- `semanticQuery` binds the same predicate ID to Semantica. Strategies are `FALSE`, `BLOCK`, `OBSERVE`, or `ESCALATE`.
+- `UNKNOWN` must never silently become false unless `unknownStrategy` explicitly says `FALSE`; `CONFLICT` should normally block or escalate.
+- An `OBSERVE` state needs a defined action whose `observes` contains that state. Observation means the executor obtains a truth value; it is not a guaranteed positive effect.
 - `effects` asserts facts; `removes` retracts facts made stale by the transition.
 - Failure triggers are `FAILURE`, `TIMEOUT`, `REJECTION`, `CANCELLATION`, `PARTIAL_SUCCESS`, or `BUSINESS_RULE`.
 - A non-terminal failure mode needs a defined `recoveryActionId`.

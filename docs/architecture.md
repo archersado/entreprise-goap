@@ -15,7 +15,7 @@ SemanticGoapValidator ----> reject unknown predicates/executors
 SemanticGoapCompiler -----> Embabel AgentBuilder -----> Embabel Agent
       |
       v
-Runtime: observe -> plan -> execute one action -> collect evidence -> replan
+Runtime: project Semantica snapshot -> plan -> execute one action -> commit outcome -> replan
 ```
 
 ## 为什么 IR 仍然强类型
@@ -48,4 +48,20 @@ Runtime: observe -> plan -> execute one action -> collect evidence -> replan
 - 访谈抽取当前为规则基线，尚未接真实 LLM。
 - 本地运行器验证规划语义和重规划，尚未把动态 Agent 部署到 Embabel `AgentPlatform`。
 - checkpoint 当前只存在于一次 HTTP 响应中，尚未接 PostgreSQL/event store。
-- `effects` 当前只表达正向谓词；失败分支应扩展为显式 outcome predicates。
+- Layer 1 已支持 `effects`、`removes`、`observes` 以及显式 failure outcome predicates。
+- 当前 Semantica adapter 接收版本化 snapshot；生产环境仍需替换为真实 batch query/event commit client。
+
+## Layer 1 语义闭环
+
+```text
+Semantica snapshot (TRUE/FALSE/UNKNOWN/CONFLICT)
+        -> SemanticStateProjector
+        -> GOAP WorldState + block/observe/escalate decisions
+        -> shortest plan
+        -> execute exactly one action
+        -> ActionOutcome (assert/retract/observe)
+        -> commit truth/evidence
+        -> replan
+```
+
+`effects` 是搜索时的预测；`ActionOutcome` 才是运行时事实。观察动作在搜索中乐观地代表“执行后可获知真值”，但 executor 没有返回观察结果时，运行会停在 `AWAITING_OBSERVATION`。

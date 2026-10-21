@@ -69,6 +69,14 @@ async function postJson(path, body, signal) {
   return value
 }
 
+function sessionId(exec) {
+  return exec.agent?.sessionId ? String(exec.agent.sessionId) : undefined
+}
+
+function contextual(exec, key, value) {
+  return { [key]: value, ...(sessionId(exec) ? { sessionId: sessionId(exec) } : {}) }
+}
+
 const jsonOutput = {
   schema: { type: 'json' },
   render: (_args, value) => [{ type: 'text', text: JSON.stringify(value) }],
@@ -76,14 +84,27 @@ const jsonOutput = {
 
 export function apply(ctx) {
   ctx.tools.register(defineTool({
+    name: 'semantic_goap_scenario_current',
+    description: 'Read the complete persisted scenario and latest version bound by the GUI to this CUI session. Call this first when the user switches a scenario, edits an older artifact into a new version, or asks to continue previous work.',
+    parameters: {},
+    output: jsonOutput,
+    timeoutMs: 30_000,
+    execute: (_args, exec) => {
+      const currentSessionId = sessionId(exec)
+      if (!currentSessionId) throw new Error('Current DSH session id is unavailable')
+      return postJson('/api/scenarios/current', { sessionId: currentSessionId }, exec.signal)
+    },
+  }))
+
+  ctx.tools.register(defineTool({
     name: 'semantic_goap_spec_review',
-    description: 'Review the versioned InterviewSpec maintained through the human-Agent interview. Call this after every meaningful user answer. The review requires each action to declare failure modes (or a justified absence), reversibility, recovery, and compensation links. Ask the returned clarificationQuestions, update the Spec, and review again. Never invent confirmation and never build while readyToBuild is false.',
+    description: 'Publish and review the current live InterviewSpec after every meaningful user answer. On the first answer, send a sparse DRAFT immediately (known fields plus empty undiscovered collections and openQuestions); do not design the whole domain first. This request/result drives the GUI. Later reviews require semanticQuery and projection strategy for every state, observing actions for OBSERVE, and exception/reversibility decisions. Never build while readyToBuild is false.',
     parameters: {
       spec: { type: 'json', required: true, description: 'Complete current InterviewSpec JSON, including open questions, confirmed/rejected claims, version and status' },
     },
     output: jsonOutput,
     timeoutMs: 30_000,
-    execute: (args, exec) => postJson('/api/interviews/spec/review', normalizeInterviewSpec(args.spec), exec.signal),
+    execute: (args, exec) => postJson('/api/interviews/spec/review', contextual(exec, 'spec', normalizeInterviewSpec(args.spec)), exec.signal),
   }))
 
   ctx.tools.register(defineTool({
@@ -94,7 +115,7 @@ export function apply(ctx) {
     },
     output: jsonOutput,
     timeoutMs: 30_000,
-    execute: (args, exec) => postJson('/api/interviews/spec/build', normalizeInterviewSpec(args.spec), exec.signal),
+    execute: (args, exec) => postJson('/api/interviews/spec/build', contextual(exec, 'spec', normalizeInterviewSpec(args.spec)), exec.signal),
   }))
 
   ctx.tools.register(defineTool({
@@ -105,7 +126,7 @@ export function apply(ctx) {
     },
     output: jsonOutput,
     timeoutMs: 30_000,
-    execute: (args, exec) => postJson('/api/models/validate', normalizeSemanticModel(args.model), exec.signal),
+    execute: (args, exec) => postJson('/api/models/validate', contextual(exec, 'model', normalizeSemanticModel(args.model)), exec.signal),
   }))
 
   ctx.tools.register(defineTool({
@@ -116,7 +137,23 @@ export function apply(ctx) {
     },
     output: jsonOutput,
     timeoutMs: 30_000,
-    execute: (args, exec) => postJson('/api/models/compile', normalizeSemanticModel(args.model), exec.signal),
+    execute: (args, exec) => postJson('/api/models/compile', contextual(exec, 'model', normalizeSemanticModel(args.model)), exec.signal),
+  }))
+
+  ctx.tools.register(defineTool({
+    name: 'semantic_goap_project',
+    description: 'Project a versioned Semantica four-valued snapshot into GOAP world state. Returns explicit FALSE, BLOCK, OBSERVE and ESCALATE decisions; never coerce UNKNOWN silently.',
+    parameters: {
+      model: { type: 'json', required: true, description: 'Validated Layer 1 semantic model' },
+      snapshot: { type: 'json', required: true, description: 'Semantica snapshot with revision and facts using TRUE/FALSE/UNKNOWN/CONFLICT' },
+    },
+    output: jsonOutput,
+    timeoutMs: 30_000,
+    execute: (args, exec) => postJson('/api/semantic/project', {
+      model: normalizeSemanticModel(args.model),
+      snapshot: parseJsonValue(args.snapshot),
+      ...(sessionId(exec) ? { sessionId: sessionId(exec) } : {}),
+    }, exec.signal),
   }))
 
   ctx.tools.register(defineTool({
@@ -126,9 +163,15 @@ export function apply(ctx) {
       model: { type: 'json', required: true, description: 'Validated and compiled GOAP model' },
       goalId: { type: 'string', required: true, description: 'Goal identifier' },
       initialPredicates: { type: 'array', items: { type: 'string' }, description: 'Facts already true before execution' },
+      semanticSnapshot: { type: 'json', description: 'Optional versioned Semantica snapshot; supersedes initialPredicates' },
+      outcomeOverrides: { type: 'json', description: 'MVP executor outcomes keyed by action id (asserted/retracted/observed); production executors return these directly' },
     },
     output: jsonOutput,
     timeoutMs: 120_000,
-    execute: (args, exec) => postJson('/api/agents/run', { ...args, model: normalizeSemanticModel(args.model) }, exec.signal),
+    execute: (args, exec) => postJson('/api/agents/run', {
+      ...args,
+      model: normalizeSemanticModel(args.model),
+      ...(sessionId(exec) ? { sessionId: sessionId(exec) } : {}),
+    }, exec.signal),
   }))
 }

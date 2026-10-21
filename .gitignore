@@ -6,3 +6,4 @@ target/
 *.log
 .env
 .dsh-runtime/
+.goap-data/

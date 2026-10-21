@@ -3,6 +3,9 @@ package com.acme.enterprisegoap.api
 import com.acme.enterprisegoap.interview.InterviewSpec
 import com.acme.enterprisegoap.model.SemanticGoapModel
 import com.acme.enterprisegoap.service.ExecuteRequest
+import com.acme.enterprisegoap.service.ProjectionRequest
+import com.acme.enterprisegoap.model.ActionOutcome
+import com.acme.enterprisegoap.semantic.SemanticSnapshot
 import org.springframework.stereotype.Component
 import tools.jackson.databind.JsonNode
 import tools.jackson.databind.ObjectMapper
@@ -43,6 +46,28 @@ class GoapRequestDecoder(private val objectMapper: ObjectMapper) {
             model = model(modelNode),
             goalId = goalId,
             initialPredicates = initialNode?.values()?.map { it.asString() }?.toSet().orEmpty(),
+            semanticSnapshot = request.get("semanticSnapshot")?.let {
+                decode("semanticSnapshot", decodeJsonStrings(it), SemanticSnapshot::class.java)
+            },
+            outcomeOverrides = request.get("outcomeOverrides")?.let { overrides ->
+                require(overrides.isObject) { "run request field 'outcomeOverrides' must be an object keyed by action id" }
+                overrides.properties().associate { (actionId, value) ->
+                    actionId to decode("outcomeOverrides.$actionId", decodeJsonStrings(value), ActionOutcome::class.java)
+                }
+            }.orEmpty(),
+        )
+    }
+
+    fun projection(body: JsonNode): ProjectionRequest {
+        val request = decodeJsonStrings(body)
+        require(request.isObject) { "projection request must be a JSON object" }
+        val modelNode = request.get("model")
+            ?: throw IllegalArgumentException("projection request is missing required field 'model'")
+        val snapshotNode = request.get("snapshot")
+            ?: throw IllegalArgumentException("projection request is missing required field 'snapshot'")
+        return ProjectionRequest(
+            model = model(modelNode),
+            snapshot = decode("snapshot", decodeJsonStrings(snapshotNode), SemanticSnapshot::class.java),
         )
     }
 

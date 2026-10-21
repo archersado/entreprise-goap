@@ -6,6 +6,7 @@ import com.acme.enterprisegoap.model.ClaimStatus
 import com.acme.enterprisegoap.model.GoalSpec
 import com.acme.enterprisegoap.model.PolicySpec
 import com.acme.enterprisegoap.model.PredicateSpec
+import com.acme.enterprisegoap.model.ProjectionStrategy
 import com.acme.enterprisegoap.model.SemanticGoapModel
 import com.acme.enterprisegoap.model.SourceClaim
 import org.springframework.stereotype.Component
@@ -43,6 +44,9 @@ data class SpecState(
     val description: String = "",
     val observable: Boolean = true,
     val evidenceRequired: String = "",
+    val semanticQuery: String = "",
+    val unknownStrategy: ProjectionStrategy = ProjectionStrategy.FALSE,
+    val conflictStrategy: ProjectionStrategy = ProjectionStrategy.BLOCK,
 )
 
 data class SpecAction(
@@ -53,6 +57,7 @@ data class SpecAction(
     val preconditions: Set<String> = emptySet(),
     val effects: Set<String> = emptySet(),
     val removes: Set<String> = emptySet(),
+    val observes: Set<String> = emptySet(),
     val executor: String = "demo:semantic-action",
     val evidenceType: String = "",
     val failureHandling: String = "",
@@ -124,14 +129,20 @@ class InterviewSpecService {
                 if (state.id.isBlank()) add("states[$index].id")
                 if (state.description.isBlank()) add("states[$index].description")
                 if (state.evidenceRequired.isBlank()) add("states[$index].evidenceRequired")
+                if (state.semanticQuery.isBlank()) add("states[$index].semanticQuery")
+                if (state.unknownStrategy == ProjectionStrategy.OBSERVE &&
+                    spec.actions.none { state.id in it.observes }
+                ) {
+                    add("states[$index].observerAction")
+                }
             }
             spec.actions.forEachIndexed { index, action ->
                 if (action.id.isBlank()) add("actions[$index].id")
                 if (action.name.isBlank()) add("actions[$index].name")
                 if (action.description.isBlank()) add("actions[$index].description")
                 if (action.ownerRole !in actorIds) add("actions[$index].ownerRole")
-                if (action.effects.isEmpty()) add("actions[$index].effects")
-                if ((action.preconditions + action.effects + action.removes).any { it !in stateIds }) {
+                if (action.effects.isEmpty() && action.removes.isEmpty() && action.observes.isEmpty()) add("actions[$index].effects")
+                if ((action.preconditions + action.effects + action.removes + action.observes).any { it !in stateIds }) {
                     add("actions[$index].stateReferences")
                 }
                 if ((action.effects intersect action.removes).isNotEmpty()) add("actions[$index].conflictingEffects")
@@ -196,6 +207,8 @@ class InterviewSpecService {
                 path.endsWith(".reverseActionConflict") -> "不可逆动作不能再引用逆向动作，请确认业务语义。"
                 path.endsWith(".evidenceType") || path.endsWith(".evidenceRequired") ->
                     "每个动作或状态需要留下什么证据？"
+                path.endsWith(".semanticQuery") -> "这个状态由 Semantica 的哪个查询或规则判定？请给出稳定的语义表达式。"
+                path.endsWith(".observerAction") -> "该状态为 UNKNOWN 时需要主动观察；哪个 Action 负责获得它的真实值？"
                 path.endsWith(".stateReferences") -> "动作、目标引用的状态是否已经完整定义？"
                 else -> "请补全 Spec 字段：$path。"
             }
@@ -219,11 +232,15 @@ class InterviewSpecService {
             id = spec.id,
             name = spec.title,
             description = spec.summary,
+            version = spec.version,
             predicates = spec.states.map { state ->
                 PredicateSpec(
                     id = state.id,
                     description = "${state.description}；证据：${state.evidenceRequired}",
                     closedWorld = true,
+                    semanticQuery = state.semanticQuery,
+                    unknownStrategy = state.unknownStrategy,
+                    conflictStrategy = state.conflictStrategy,
                 )
             },
             capabilities = spec.actions.map { action ->
@@ -235,6 +252,7 @@ class InterviewSpecService {
                     preconditions = action.preconditions,
                     effects = action.effects,
                     removes = action.removes,
+                    observes = action.observes,
                     cost = action.cost,
                     idempotent = action.idempotent,
                     evidenceType = action.evidenceType,

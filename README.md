@@ -1,4 +1,4 @@
-# Enterprise Semantic GOAP MVP
+# Enterprise Semantica + GOAP Layer 1 MVP
 
 这个项目验证一条尽量短、但边界真实的链路：
 
@@ -48,7 +48,15 @@ curl -s http://localhost:8080/api/pipeline/run \
 - `POST /api/models/validate`
 - `POST /api/models/compile`
 - `POST /api/agents/run`
+- `POST /api/semantic/project`
 - `POST /api/pipeline/run`
+- `GET|POST /api/scenarios`：列出或新建持久化场景
+- `GET /api/scenarios/{id}`：读取场景及全部版本
+- `PUT /api/scenarios/{id}/binding`：把场景绑定到当前 CUI 会话
+- `POST /api/scenarios/{id}/versions`：基于已有产物追加新版本
+- `POST /api/scenarios/current`：让 Agent 读取当前会话绑定的完整上下文
+
+场景默认持久化到 `.goap-data/scenarios`，可用 `GOAP_SCENARIO_STORE_DIR` 修改。首次从 CUI 导入会保留原 Spec 状态；从 GUI 编辑旧产物时始终追加版本并回到 `DRAFT`，必须重新访谈确认后才能构建和运行。
 
 ## 关键原则
 
@@ -59,6 +67,20 @@ curl -s http://localhost:8080/api/pipeline/run \
 5. 跨 Agent 协作由 `ownerRole` 和 capability 分配表达；规划图与具体 Agent 进程解耦。
 
 进一步设计见 [架构说明](docs/architecture.md) 和 [DSH 集成判断](docs/dsh-integration.md)。
+
+## Layer 1：共享的轻量模型
+
+当前 MVP 不引入 OPM，只维护一份可版本化的 JSON/YAML 等价契约：
+
+```text
+Predicate（Semantica query + UNKNOWN/CONFLICT 投影策略）
+Action（preconditions + effects/removes/observes + executor）
+Goal（satisfiedBy）
+```
+
+完整示例见 [`examples/layer-1-semantic-goap.json`](examples/layer-1-semantic-goap.json)。Semantica 快照使用四值事实：`TRUE`、`FALSE`、`UNKNOWN`、`CONFLICT`。投影策略支持 `FALSE`、`BLOCK`、`OBSERVE`、`ESCALATE`。
+
+运行时，`observes` 只让 Planner 找到“获取事实”的路径，不会直接把谓词当成 `TRUE`。真实值必须由 executor outcome 或下一版 Semantica snapshot 提交；没有结果时运行以 `AWAITING_OBSERVATION` 停止，而不是伪造成功。
 
 ## 参考实现
 
